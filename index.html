@@ -588,17 +588,30 @@
     if(el) el.textContent = (el.textContent ? el.textContent + ' | ' : '') + msg;
   }
 
+  function cloudStorageSupported(tg){
+    if(!tg || !tg.CloudStorage) return false;
+    if(tg.isVersionAtLeast){
+      try { return tg.isVersionAtLeast('6.9'); } catch(e){ return false; }
+    }
+    return true;
+  }
+
   function saveState(){
     var json = JSON.stringify(state);
     var tg = window.Telegram && window.Telegram.WebApp;
-    if(tg && tg.CloudStorage){
-      tg.CloudStorage.setItem(STORAGE_KEY, json, function(err, ok){
-        debugLog('cloud save: ' + (err ? ('ERR ' + err) : (ok ? 'ok' : 'ok=false')));
-      });
+    if(cloudStorageSupported(tg)){
+      try {
+        tg.CloudStorage.setItem(STORAGE_KEY, json, function(err, ok){
+          debugLog('cloud save: ' + (err ? ('ERR ' + err) : (ok ? 'ok' : 'ok=false')));
+        });
+      } catch(e){
+        debugLog('cloud save threw, using local: ' + e.message);
+        try { localStorage.setItem(STORAGE_KEY, json); } catch(e2){}
+      }
     } else {
       try {
         localStorage.setItem(STORAGE_KEY, json);
-        debugLog('local save: ok (no CloudStorage bridge, tg=' + (tg ? 'yes' : 'no') + ')');
+        debugLog('local save: ok (cloud unsupported, tg=' + (tg ? 'yes' : 'no') + ' v=' + (tg ? tg.version : '-') + ')');
       } catch(e){
         debugLog('local save FAILED: ' + e.message);
       }
@@ -857,52 +870,65 @@
 
   function loadData(){
     var tg = window.Telegram && window.Telegram.WebApp;
-    debugLog('tg=' + (tg ? 'yes' : 'no') + ' cloudStorage=' + (tg && tg.CloudStorage ? 'yes' : 'no') + ' version=' + (tg ? tg.version : '-'));
-    if(tg && tg.CloudStorage){
+    debugLog('tg=' + (tg ? 'yes' : 'no') + ' cloudStorage=' + (tg && tg.CloudStorage ? 'yes' : 'no') + ' version=' + (tg ? tg.version : '-') + ' supported=' + cloudStorageSupported(tg));
+    if(cloudStorageSupported(tg)){
       var settled = false;
       var timeoutId = setTimeout(function(){
         if(settled) return;
         settled = true;
         debugLog('cloud timeout, no response — falling back');
-        loadInitialData();
+        loadData_localFallback();
       }, 1500);
-      tg.CloudStorage.getItem(STORAGE_KEY, function(err, value){
-        if(settled) return;
-        settled = true;
-        clearTimeout(timeoutId);
-        if(!err && value){
-          try {
-            state = cleanState(JSON.parse(value));
-            document.getElementById('banner').hidden = true;
-            debugLog('loaded from cloud, ' + value.length + ' chars');
-            saveState();
-            render();
-            return;
-          } catch(e){
-            debugLog('cloud value parse error: ' + e.message);
+      try {
+        tg.CloudStorage.getItem(STORAGE_KEY, function(err, value){
+          if(settled) return;
+          settled = true;
+          clearTimeout(timeoutId);
+          if(!err && value){
+            try {
+              state = cleanState(JSON.parse(value));
+              document.getElementById('banner').hidden = true;
+              debugLog('loaded from cloud, ' + value.length + ' chars');
+              saveState();
+              render();
+              return;
+            } catch(e){
+              debugLog('cloud value parse error: ' + e.message);
+            }
+          } else if(err){
+            debugLog('cloud load error: ' + err);
+          } else {
+            debugLog('cloud empty, first run');
           }
-        } else if(err){
-          debugLog('cloud load error: ' + err);
-        } else {
-          debugLog('cloud empty, first run');
+          loadInitialData();
+        });
+      } catch(e){
+        if(!settled){
+          settled = true;
+          clearTimeout(timeoutId);
+          debugLog('cloud getItem threw: ' + e.message);
+          loadData_localFallback();
         }
-        loadInitialData();
-      });
-    } else {
-      var saved;
-      try { saved = localStorage.getItem(STORAGE_KEY); } catch(e){}
-      if(saved){
-        try {
-          state = cleanState(JSON.parse(saved));
-          document.getElementById('banner').hidden = true;
-          debugLog('loaded from localStorage, ' + saved.length + ' chars');
-          saveState();
-          render();
-          return;
-        } catch(e){}
       }
-      loadInitialData();
+    } else {
+      loadData_localFallback();
     }
+  }
+
+  function loadData_localFallback(){
+    var saved;
+    try { saved = localStorage.getItem(STORAGE_KEY); } catch(e){}
+    if(saved){
+      try {
+        state = cleanState(JSON.parse(saved));
+        document.getElementById('banner').hidden = true;
+        debugLog('loaded from localStorage, ' + saved.length + ' chars');
+        saveState();
+        render();
+        return;
+      } catch(e){}
+    }
+    loadInitialData();
   }
 
   // ---------- Add habit sheet ----------
