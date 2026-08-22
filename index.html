@@ -41,9 +41,19 @@
   }
 
   .app{
+    position:relative;
+    z-index:1;
     max-width:560px;
     margin:0 auto;
     padding: max(20px, env(safe-area-inset-top)) 18px calc(96px + env(safe-area-inset-bottom)) 18px;
+  }
+
+  .sparkle-layer{
+    position:fixed;
+    inset:0;
+    pointer-events:none;
+    z-index:0;
+    overflow:hidden;
   }
 
   /* ---------- Fallback banner ---------- */
@@ -466,6 +476,7 @@
 </head>
 <body>
 
+<div id="sparkle-layer" class="sparkle-layer"></div>
 <div class="app">
   <div id="banner" class="banner" hidden>data.json не загрузился — показываю встроенный пример. Всё работает, кроме твоих настоящих данных.</div>
 
@@ -487,7 +498,6 @@
         </div>
         <div class="progress-track"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
         <div class="streak-pill" id="streak-pill" style="margin-top:12px;">
-          <svg id="streak-icon" viewBox="0 0 24 24" fill="none"></svg>
           <span id="streak-text">0 дней подряд</span>
         </div>
       </div>
@@ -653,7 +663,8 @@
   ];
 
   function renderGrowthIcon(streak){
-    document.getElementById('streak-icon').innerHTML = GROWTH_SVG[growthStage(streak)];
+    var el = document.getElementById('streak-icon');
+    if(el) el.innerHTML = GROWTH_SVG[growthStage(streak)];
   }
 
   // ---------- Calendar heatmap ----------
@@ -969,6 +980,25 @@
     render();
   });
 
+  function initSparkles(){
+    var layer = document.getElementById('sparkle-layer');
+    if(!layer) return;
+    var colors = ['#ffffff', '#ffffff', '#F3D9CE', '#F0D6DC', '#E3DCF0'];
+    var starPath = 'M12 2l1.9 5.1 5.4.5-4.1 3.6 1.3 5.3L12 13.6 7.5 16.5l1.3-5.3-4.1-3.6 5.4-.5L12 2Z';
+    var html = '';
+    for(var i=0;i<26;i++){
+      var size = (6 + Math.random()*15).toFixed(1);
+      var color = colors[Math.floor(Math.random()*colors.length)];
+      var top = (Math.random()*100).toFixed(1);
+      var left = (Math.random()*100).toFixed(1);
+      var opacity = (0.3 + Math.random()*0.5).toFixed(2);
+      var rot = (Math.random()*50 - 25).toFixed(0);
+      html += '<svg style="position:absolute;top:' + top + '%;left:' + left + '%;width:' + size + 'px;height:' + size + 'px;opacity:' + opacity + ';transform:rotate(' + rot + 'deg)" viewBox="0 0 24 24" fill="' + color + '"><path d="' + starPath + '"/></svg>';
+    }
+    layer.innerHTML = html;
+  }
+
+  initSparkles();
   loadData();
 })();
 </script>
