@@ -495,7 +495,7 @@
 
   <main id="habit-list"></main>
 
-  <div id="debug-footer" style="display:none;font-family:monospace;font-size:11px;color:#999;text-align:center;padding:12px 8px;opacity:0.7;"></div>
+  <div id="debug-footer" style="font-family:monospace;font-size:11px;color:#999;text-align:center;padding:12px 8px;opacity:0.7;"></div>
 
   <div class="list-label">🪴 Моя жизнь растёт</div>
   <div class="garden-intro">Каждая привычка — растение в твоём саду. 1 день — росток, 7 дней подряд — куст, 30 — дерево. Считаем с 22 августа — раньше по каждой привычке отдельно не отслеживали.</div>
@@ -585,7 +585,7 @@
 
   function debugLog(msg){
     var el = document.getElementById('debug-footer');
-    if(el) el.textContent = msg;
+    if(el) el.textContent = (el.textContent ? el.textContent + ' | ' : '') + msg;
   }
 
   function saveState(){
@@ -846,7 +846,8 @@
         saveState();
         render();
       })
-      .catch(function(){
+      .catch(function(e){
+        debugLog('data.json fetch failed: ' + (e && e.message ? e.message : e));
         state = cleanState(FALLBACK);
         document.getElementById('banner').hidden = false;
         saveState();
