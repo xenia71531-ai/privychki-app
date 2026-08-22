@@ -836,7 +836,17 @@
     var tg = window.Telegram && window.Telegram.WebApp;
     debugLog('tg=' + (tg ? 'yes' : 'no') + ' cloudStorage=' + (tg && tg.CloudStorage ? 'yes' : 'no') + ' version=' + (tg ? tg.version : '-'));
     if(tg && tg.CloudStorage){
+      var settled = false;
+      var timeoutId = setTimeout(function(){
+        if(settled) return;
+        settled = true;
+        debugLog('cloud timeout, no response — falling back');
+        loadInitialData();
+      }, 1500);
       tg.CloudStorage.getItem(STORAGE_KEY, function(err, value){
+        if(settled) return;
+        settled = true;
+        clearTimeout(timeoutId);
         if(!err && value){
           try {
             state = cleanState(JSON.parse(value));
