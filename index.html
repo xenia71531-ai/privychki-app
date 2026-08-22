@@ -10,20 +10,20 @@
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
   :root{
-    --bg:#F3F1EA;
-    --card:#FBFAF5;
-    --card-alt:#E9E7DA;
-    --olive:#8CA07D;
-    --olive-deep:#6E7E60;
-    --olive-soft:#E3E9DA;
+    --bg:#F6ECE9;
+    --card:#FFFBF9;
+    --card-alt:#F1DED9;
+    --olive:#90777E;
+    --olive-deep:#725D63;
+    --olive-soft:#EADCDD;
     --bloom:#CFA08D;
-    --lvl1:#D7DFC9;
-    --lvl2:#B9C9A2;
-    --lvl3:#9AB081;
-    --text:#38352E;
-    --text-muted:#948C7C;
-    --divider:#E1DCC9;
-    --shadow: 0 10px 28px rgba(56,53,46,0.08);
+    --lvl1:#EAD4D2;
+    --lvl2:#D3ABAC;
+    --lvl3:#B07E85;
+    --text:#3D2E30;
+    --text-muted:#9C8286;
+    --divider:#E9D6D3;
+    --shadow: 0 10px 28px rgba(87,55,58,0.10);
   }
 
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
@@ -67,10 +67,14 @@
   }
 
   .photo-card{
-    flex:0 0 38%;
-    border-radius:24px;
+    flex:0 0 auto;
+    width:104px;
+    height:104px;
+    border-radius:50%;
     overflow:hidden;
     box-shadow:var(--shadow);
+    border:3px solid var(--card);
+    align-self:center;
   }
   .photo-card img{
     width:100%;
@@ -185,6 +189,15 @@
   }
   .habit:active{ transform:scale(0.98); }
 
+  .habit-icon{
+    flex:0 0 auto;
+    width:38px; height:38px;
+    border-radius:50%;
+    background:var(--olive-soft);
+    display:flex; align-items:center; justify-content:center;
+    font-size:18px;
+  }
+
   .check{
     flex:0 0 auto;
     width:26px; height:26px;
@@ -192,6 +205,7 @@
     border:2px solid var(--card-alt);
     display:flex; align-items:center; justify-content:center;
     transition:background .25s ease, border-color .25s ease;
+    margin-left:auto;
   }
   .check svg{
     width:14px; height:14px;
@@ -220,6 +234,42 @@
     padding:40px 20px;
     color:var(--text-muted);
     font-size:14px;
+  }
+
+  /* ---------- Garden ---------- */
+  .garden-intro{
+    font-size:12.5px;
+    color:var(--text-muted);
+    margin:2px 4px 14px 4px;
+    line-height:1.45;
+  }
+  .garden-grid{
+    display:grid;
+    grid-template-columns:repeat(2,1fr);
+    gap:10px;
+  }
+  .plant-tile{
+    background:var(--card);
+    border-radius:20px;
+    padding:16px 14px;
+    box-shadow:var(--shadow);
+    text-align:center;
+  }
+  .plant-icon{
+    font-size:34px;
+    line-height:1;
+    margin-bottom:8px;
+    filter:grayscale(0);
+  }
+  .plant-icon.stage-0{ font-size:22px; opacity:.55; }
+  .plant-name{
+    font-size:13px;
+    font-weight:600;
+    margin-bottom:2px;
+  }
+  .plant-days{
+    font-size:11.5px;
+    color:var(--text-muted);
   }
 
   /* ---------- Calendar heatmap ---------- */
@@ -401,7 +451,11 @@
 
   <main id="habit-list"></main>
 
-  <div id="debug-footer" style="font-family:monospace;font-size:11px;color:#999;text-align:center;padding:12px 8px;opacity:0.7;"></div>
+  <div id="debug-footer" style="display:none;font-family:monospace;font-size:11px;color:#999;text-align:center;padding:12px 8px;opacity:0.7;"></div>
+
+  <div class="list-label">🪴 Моя жизнь растёт</div>
+  <div class="garden-intro">Каждая привычка — растение в твоём саду. 1 день — росток, 7 дней подряд — куст, 30 — дерево. Считаем с 22 августа — раньше по каждой привычке отдельно не отслеживали.</div>
+  <div class="garden-grid" id="garden-grid"></div>
 
   <div class="calendar-card">
     <div class="calendar-head">
@@ -619,15 +673,69 @@
       var row = document.createElement('div');
       row.className = 'habit' + (h.done ? ' done' : '');
       row.innerHTML =
-        '<div class="check"><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="' + getComputedStyle(document.documentElement).getPropertyValue('--card') + '" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>' +
-        '<div class="habit-name">' + escapeHtml(h.name) + '</div>';
+        '<div class="habit-icon">' + habitIcon(h.name) + '</div>' +
+        '<div class="habit-name">' + escapeHtml(h.name) + '</div>' +
+        '<div class="check"><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="' + getComputedStyle(document.documentElement).getPropertyValue('--card') + '" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>';
       row.addEventListener('click', function(){
         h.done = !h.done;
+        if(h.done){
+          var todayStr = new Date().toISOString().slice(0,10);
+          if(h.lastGrowthDate !== todayStr){
+            h.growthDays = (h.growthDays || 0) + 1;
+            h.lastGrowthDate = todayStr;
+          }
+        }
         saveState();
         render();
       });
       list.appendChild(row);
     });
+
+    renderGarden();
+  }
+
+  function habitIcon(name){
+    var n = name.toLowerCase();
+    if(n.indexOf('данте') > -1 || n.indexOf('читат') > -1) return '📖';
+    if(n.indexOf('автошкол') > -1) return '🚗';
+    if(n.indexOf('smm') > -1) return '📱';
+    if(n.indexOf('claude') > -1) return '💻';
+    if(n.indexOf('шахмат') > -1) return '♟️';
+    if(n.indexOf('фитнес') > -1) return '🏋️';
+    if(n.indexOf('доч') > -1 || n.indexOf('благодарност') > -1) return '💛';
+    return '🌱';
+  }
+
+  function plantStage(days){
+    days = days || 0;
+    if(days >= 30) return { icon:'🌳', cls:'stage-3', label:'дерево' };
+    if(days >= 7)  return { icon:'🌿', cls:'stage-2', label:'куст' };
+    if(days >= 1)  return { icon:'🌱', cls:'stage-1', label:'росток' };
+    return { icon:'·', cls:'stage-0', label:'семя' };
+  }
+
+  function renderGarden(){
+    var grid = document.getElementById('garden-grid');
+    if(!grid) return;
+    grid.innerHTML = '';
+    state.habits.forEach(function(h){
+      var days = h.growthDays || 0;
+      var stage = plantStage(days);
+      var tile = document.createElement('div');
+      tile.className = 'plant-tile';
+      tile.innerHTML =
+        '<div class="plant-icon ' + stage.cls + '">' + stage.icon + '</div>' +
+        '<div class="plant-name">' + escapeHtml(h.name) + '</div>' +
+        '<div class="plant-days">' + (days ? (days + streakWordDays(days) + ' · ' + stage.label) : 'ещё не начато') + '</div>';
+      grid.appendChild(tile);
+    });
+  }
+
+  function streakWordDays(n){
+    var mod10 = n % 10, mod100 = n % 100;
+    if(mod10 === 1 && mod100 !== 11) return ' день';
+    if([2,3,4].indexOf(mod10) > -1 && [12,13,14].indexOf(mod100) === -1) return ' дня';
+    return ' дней';
   }
 
   function streakWord(n){
