@@ -462,6 +462,17 @@
 
   var state = null;
   var nextId = 1000;
+  var STORAGE_KEY = 'trackerState';
+
+  function saveState(){
+    var json = JSON.stringify(state);
+    var tg = window.Telegram && window.Telegram.WebApp;
+    if(tg && tg.CloudStorage){
+      tg.CloudStorage.setItem(STORAGE_KEY, json, function(){});
+    } else {
+      try { localStorage.setItem(STORAGE_KEY, json); } catch(e){}
+    }
+  }
   var MONTHS_RU = ["Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"];
 
   function hourGreeting(){
@@ -598,6 +609,7 @@
         '<div class="habit-name">' + escapeHtml(h.name) + '</div>';
       row.addEventListener('click', function(){
         h.done = !h.done;
+        saveState();
         render();
       });
       list.appendChild(row);
@@ -617,19 +629,50 @@
     });
   }
 
-  function loadData(){
+  function loadInitialData(){
     fetch('data.json?v=' + Date.now())
       .then(function(res){ if(!res.ok) throw new Error('bad status'); return res.json(); })
       .then(function(json){
         state = json;
         document.getElementById('banner').hidden = true;
+        saveState();
         render();
       })
       .catch(function(){
         state = FALLBACK;
         document.getElementById('banner').hidden = false;
+        saveState();
         render();
       });
+  }
+
+  function loadData(){
+    var tg = window.Telegram && window.Telegram.WebApp;
+    if(tg && tg.CloudStorage){
+      tg.CloudStorage.getItem(STORAGE_KEY, function(err, value){
+        if(!err && value){
+          try {
+            state = JSON.parse(value);
+            document.getElementById('banner').hidden = true;
+            render();
+            return;
+          } catch(e){}
+        }
+        loadInitialData();
+      });
+    } else {
+      var saved;
+      try { saved = localStorage.getItem(STORAGE_KEY); } catch(e){}
+      if(saved){
+        try {
+          state = JSON.parse(saved);
+          document.getElementById('banner').hidden = true;
+          render();
+          return;
+        } catch(e){}
+      }
+      loadInitialData();
+    }
   }
 
   // ---------- Add habit sheet ----------
@@ -664,6 +707,7 @@
     var name = input.value.trim();
     if(!name) return;
     state.habits.push({ id: nextId++, name: name, done:false });
+    saveState();
     closeSheet();
     render();
   });
