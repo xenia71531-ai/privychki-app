@@ -401,6 +401,8 @@
 
   <main id="habit-list"></main>
 
+  <div id="debug-footer" style="font-family:monospace;font-size:11px;color:#999;text-align:center;padding:12px 8px;opacity:0.7;"></div>
+
   <div class="calendar-card">
     <div class="calendar-head">
       <h3 class="serif" id="calendar-month">—</h3>
@@ -464,13 +466,25 @@
   var nextId = 1000;
   var STORAGE_KEY = 'trackerState';
 
+  function debugLog(msg){
+    var el = document.getElementById('debug-footer');
+    if(el) el.textContent = msg;
+  }
+
   function saveState(){
     var json = JSON.stringify(state);
     var tg = window.Telegram && window.Telegram.WebApp;
     if(tg && tg.CloudStorage){
-      tg.CloudStorage.setItem(STORAGE_KEY, json, function(){});
+      tg.CloudStorage.setItem(STORAGE_KEY, json, function(err, ok){
+        debugLog('cloud save: ' + (err ? ('ERR ' + err) : (ok ? 'ok' : 'ok=false')));
+      });
     } else {
-      try { localStorage.setItem(STORAGE_KEY, json); } catch(e){}
+      try {
+        localStorage.setItem(STORAGE_KEY, json);
+        debugLog('local save: ok (no CloudStorage bridge, tg=' + (tg ? 'yes' : 'no') + ')');
+      } catch(e){
+        debugLog('local save FAILED: ' + e.message);
+      }
     }
   }
   var MONTHS_RU = ["Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"];
@@ -648,15 +662,23 @@
 
   function loadData(){
     var tg = window.Telegram && window.Telegram.WebApp;
+    debugLog('tg=' + (tg ? 'yes' : 'no') + ' cloudStorage=' + (tg && tg.CloudStorage ? 'yes' : 'no') + ' version=' + (tg ? tg.version : '-'));
     if(tg && tg.CloudStorage){
       tg.CloudStorage.getItem(STORAGE_KEY, function(err, value){
         if(!err && value){
           try {
             state = JSON.parse(value);
             document.getElementById('banner').hidden = true;
+            debugLog('loaded from cloud, ' + value.length + ' chars');
             render();
             return;
-          } catch(e){}
+          } catch(e){
+            debugLog('cloud value parse error: ' + e.message);
+          }
+        } else if(err){
+          debugLog('cloud load error: ' + err);
+        } else {
+          debugLog('cloud empty, first run');
         }
         loadInitialData();
       });
@@ -667,6 +689,7 @@
         try {
           state = JSON.parse(saved);
           document.getElementById('banner').hidden = true;
+          debugLog('loaded from localStorage, ' + saved.length + ' chars');
           render();
           return;
         } catch(e){}
